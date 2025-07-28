@@ -1,1 +1,6 @@
+# Redirect all routes to index.html for SPA
 /*    /index.html   200
+
+# Handle specific routes
+/feedback/*   /index.html   200
+/analytics    /index.html   200
