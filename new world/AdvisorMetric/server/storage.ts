@@ -10,9 +10,9 @@ export interface IStorage {
   getFeedbackResponsesByDateRange(startDate: Date, endDate: Date): Promise<FeedbackResponse[]>;
 }
 
-// Initialize database connection
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql);
+// Initialize database connection only if DATABASE_URL is available
+const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
+const db = sql ? drizzle(sql) : null;
 
 export class PostgreSQLStorage implements IStorage {
   async createFeedbackResponse(insertFeedback: InsertFeedbackResponse): Promise<FeedbackResponse> {
