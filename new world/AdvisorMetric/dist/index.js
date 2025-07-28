@@ -4,8 +4,52 @@ import express2 from "express";
 // server/routes.ts
 import { createServer } from "http";
 
+// shared/schema.ts
+import { sql } from "drizzle-orm";
+import { pgTable, text, varchar, timestamp, integer } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+var feedbackResponses = pgTable("feedback_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  rating: integer("rating").notNull(),
+  // 1-5 scale (terrible to great)
+  source: text("source"),
+  // How they heard about us
+  comments: text("comments"),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+});
+var insertFeedbackResponseSchema = createInsertSchema(feedbackResponses).pick({
+  rating: true,
+  source: true,
+  comments: true
+});
+
 // server/storage.ts
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
+import { desc, gte, lte, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
+var sql2 = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
+var db = sql2 ? drizzle(sql2) : null;
+var PostgreSQLStorage = class {
+  async createFeedbackResponse(insertFeedback) {
+    if (!db) throw new Error("Database not initialized");
+    const [feedback] = await db.insert(feedbackResponses).values(insertFeedback).returning();
+    return feedback;
+  }
+  async getAllFeedbackResponses() {
+    if (!db) throw new Error("Database not initialized");
+    return await db.select().from(feedbackResponses).orderBy(desc(feedbackResponses.createdAt));
+  }
+  async getFeedbackResponsesByDateRange(startDate, endDate) {
+    if (!db) throw new Error("Database not initialized");
+    return await db.select().from(feedbackResponses).where(
+      and(
+        gte(feedbackResponses.createdAt, startDate),
+        lte(feedbackResponses.createdAt, endDate)
+      )
+    ).orderBy(desc(feedbackResponses.createdAt));
+  }
+};
 var MemStorage = class {
   feedbackResponses;
   constructor() {
@@ -30,26 +74,7 @@ var MemStorage = class {
     return Array.from(this.feedbackResponses.values()).filter((feedback) => feedback.createdAt >= startDate && feedback.createdAt <= endDate).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 };
-var storage = new MemStorage();
-
-// shared/schema.ts
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-var feedbackResponses = pgTable("feedback_responses", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  rating: integer("rating").notNull(),
-  // 1-5 scale (terrible to great)
-  source: text("source"),
-  // How they heard about us
-  comments: text("comments"),
-  createdAt: timestamp("created_at").defaultNow().notNull()
-});
-var insertFeedbackResponseSchema = createInsertSchema(feedbackResponses).pick({
-  rating: true,
-  source: true,
-  comments: true
-});
+var storage = process.env.DATABASE_URL ? new PostgreSQLStorage() : new MemStorage();
 
 // server/routes.ts
 import { z } from "zod";
