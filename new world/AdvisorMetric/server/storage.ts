@@ -10,12 +10,13 @@ export interface IStorage {
   getFeedbackResponsesByDateRange(startDate: Date, endDate: Date): Promise<FeedbackResponse[]>;
 }
 
-// Initialize database connection
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql);
+// Initialize database connection only if DATABASE_URL is available
+const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null;
+const db = sql ? drizzle(sql) : null;
 
 export class PostgreSQLStorage implements IStorage {
   async createFeedbackResponse(insertFeedback: InsertFeedbackResponse): Promise<FeedbackResponse> {
+    if (!db) throw new Error("Database not initialized");
     const [feedback] = await db
       .insert(feedbackResponses)
       .values(insertFeedback)
@@ -24,6 +25,7 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getAllFeedbackResponses(): Promise<FeedbackResponse[]> {
+    if (!db) throw new Error("Database not initialized");
     return await db
       .select()
       .from(feedbackResponses)
@@ -31,6 +33,7 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getFeedbackResponsesByDateRange(startDate: Date, endDate: Date): Promise<FeedbackResponse[]> {
+    if (!db) throw new Error("Database not initialized");
     return await db
       .select()
       .from(feedbackResponses)
@@ -75,7 +78,7 @@ export class MemStorage implements IStorage {
   }
 }
 
-// Use PostgreSQL storage in production, memory storage for development
-export const storage = process.env.NODE_ENV === 'production' 
-  ? new PostgreSQLStorage() 
-  : new PostgreSQLStorage(); // Always use PostgreSQL now that we have a database
+// Use PostgreSQL storage when DATABASE_URL is available, memory storage otherwise
+export const storage = process.env.DATABASE_URL
+  ? new PostgreSQLStorage()
+  : new MemStorage();
