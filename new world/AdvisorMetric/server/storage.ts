@@ -16,6 +16,7 @@ const db = sql ? drizzle(sql) : null;
 
 export class PostgreSQLStorage implements IStorage {
   async createFeedbackResponse(insertFeedback: InsertFeedbackResponse): Promise<FeedbackResponse> {
+    if (!db) throw new Error("Database not initialized");
     const [feedback] = await db
       .insert(feedbackResponses)
       .values(insertFeedback)
@@ -24,6 +25,7 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getAllFeedbackResponses(): Promise<FeedbackResponse[]> {
+    if (!db) throw new Error("Database not initialized");
     return await db
       .select()
       .from(feedbackResponses)
@@ -31,6 +33,7 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getFeedbackResponsesByDateRange(startDate: Date, endDate: Date): Promise<FeedbackResponse[]> {
+    if (!db) throw new Error("Database not initialized");
     return await db
       .select()
       .from(feedbackResponses)
